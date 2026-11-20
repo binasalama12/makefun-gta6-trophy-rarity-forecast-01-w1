@@ -68,7 +68,13 @@ def logit(pct):
 
 
 def sigmoid_logit(lg):
-    return 100.0 / (1.0 + math.exp(-lg))
+    # Numerically stable logistic: a strongly negative extrapolated
+    # logit would make math.exp(-lg) overflow, so use the exp(lg)
+    # form on that side instead.  Same value, no OverflowError.
+    if lg >= 0:
+        return 100.0 / (1.0 + math.exp(-lg))
+    e = math.exp(lg)
+    return 100.0 * e / (1.0 + e)
 
 
 def round4(x):
@@ -123,7 +129,9 @@ def fit_line(xs, ys):
 
 def forecast_trophy(rates, times, target, horizon_days):
     """rates/times: parallel lists of one trophy's reads in the window."""
-    points = [(t, r) for t, r in zip(times, rates) if r is not None]
+    points = [(t, r) for t, r in zip(times, rates)
+              if r is not None and isinstance(r, (int, float))
+              and math.isfinite(r)]
     if not points:
         return quantiles_from(logit(0.0), FLAT_SPREAD)
     last_rate = points[-1][1]
